@@ -297,6 +297,61 @@ function apply_ceph_ownership_to_disks {
   chown "${CHOWN_OPT[@]}" ceph. "$(dev_part "${OSD_DEVICE}" 1)"
 }
 
+# Get a list of child devices from a root device
+function get_child_partitions {
+# $1: raw parent device
+  if [ ! -e  "${1}" ] && [ ! -b "${1}" ]; then
+    echo "Error, ${1} doesn't seem to be a valid device!"
+    exit 1
+  fi
+  PARTS=$(lsblk -no KNAME "${1}")
+  for p in $PARTS; do
+    kname=$(lsblk --nodeps -no KNAME /dev/"${p}")
+    pkname=$(lsblk --nodeps -no PKNAME /dev/"${p}")
+    if [ "${kname}" != "${pkname}" ] && [ -n "${pkname}" ]; then
+      echo /dev/"${p}"
+    fi
+  done
+}
+
+### NOTE(guits): legacy
+#
+## Get sector size of device
+#function get_sector_size_device {
+## $1 : device (eg. /dev/sda)
+#  if [ ! -e "${1}" ]; then
+#    echo "Error getting sector size of ${1} !"
+#    exit 1
+#  fi
+#  cat /sys/block/"$(basename "${1}")"/queue/hw_sector_size
+#}
+#
+## Get start position of a partition
+#function get_start_pos_partition {
+## $1 : partition (eg. /dev/sda2)
+#  local parent_device
+#  local start
+#  local sector_size
+#  parent_device=$(basename "$(get_parent_device "${1}")")
+#  if [ ! -e "${1}" ] && [ ! -b "${1}" ]; then
+#    echo "Error, ${1} doesn't seem to be a valid partition!"
+#    exit 1
+#  fi
+#  start=$(cat /sys/block/"${parent_device}"/"$(basename "${1}")"/start)
+#  sector_size=$(get_sector_size_device /dev/"$(get_parent_device "${1}")")
+#  echo $((start * sector_size))
+#}
+
+# Get parent device of a partition
+function get_parent_device {
+# $1: partition to get the parent's device (eg. /dev/sda2)
+  if [ ! -e "${1}" ] && [ ! -b "${1}" ]; then
+    echo "Error, ${1} doesn't seem to be a valid partition!"
+    exit 1
+  fi
+  lsblk --nodeps -no PKNAME "${1}"
+}
+
 # Get partition uuid of a given partition
 function get_part_uuid {
   blkid -o value -s PARTUUID "${1}"
